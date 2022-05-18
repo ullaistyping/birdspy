@@ -2,3 +2,4 @@ frames/
 out_vid.mp4
 full_color.jpg
 config.py
+__pycache__/

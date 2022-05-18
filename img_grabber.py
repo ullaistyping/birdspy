@@ -10,8 +10,11 @@ import subprocess
 import requests
 import threading
 import sys
+import shutil
 from config import *
-testing = True
+from datetime import datetime
+
+testing = False
 
 FRAME_DIR = 'frames'
 FFMPEG = "%ffmpeg%" if sys.platform == 'win32' else 'ffmpeg'
@@ -25,6 +28,7 @@ else:
 
 class MotionDetector():
 	def __init__(self):
+		self.LOG_FILE = 'detector.log'
 		self.ims = deque(maxlen = 2)
 		self.diff = None
 		self.scale = 2
@@ -35,6 +39,11 @@ class MotionDetector():
 		self.last_created = None
 		self.frame_count = 1
 		self.recording = False
+		self.remote = threading.Event()
+
+	def log(self, msg):
+		with open(self.LOG_FILE, 'a') as f:
+			f.write(f'{msg}\t{datetime.now()}\n')
 
 	def process_and_grab_img(self):
 		path = self.get_frame()
@@ -106,16 +115,38 @@ class MotionDetector():
 		t = threading.Thread(target = self._record_stream, args = (STREAM_URL, 'out_vid', 60))
 		t.start()
 
+	def grab_frames(self):
+		t = threading.Thread(target = self._grab_frames)
+		t.start()
+
+	def _grab_frames(self):
+		self.grabbing_frames = True 
+		#self.pro = subprocess.Popen(CMD, stdout=subprocess.PIPE, shell=True) #preexec_fn=os.setsid)
+		try:
+			self.pro = subprocess.check_call(CMD, shell = True)
+
+		except subprocess.CalledProcessError:
+			self.log("restarting ffmpeg frame grabber")			
+			self.grabbing_frames = False
+
+	def restart(self):
+		print('setting frame count to zero')
+		print('launching ffmpeg')
+		self.frame_count = 1
+		if os.path.exists(FRAME_DIR):
+			shutil.rmtree(FRAME_DIR)
+		os.makedirs(FRAME_DIR)
+		self.grab_frames()
+
 	def run(self):
-		i = 0
 		self.tasks = get_process()
-		self.pro = subprocess.Popen(CMD, stdout=subprocess.PIPE, shell=True) #preexec_fn=os.setsid)
+		self.restart()
+		#print(self.pro.pid)
 		time.sleep(1)
 		self.new = set(get_process()) - set(self.tasks)
 		print(self.new)
 		while True:
-			i += 1
-			print(f'capturing image {i}')
+			print(f'capturing image {self.frame_count}')
 			try:
 				self.get_next_im()
 				if len(self.ims) < 2:
@@ -132,6 +163,8 @@ class MotionDetector():
 						print('starting recording')
 						post_file_to_discord("full_color.jpg")
 						self.record_stream()
+				if not self.grabbing_frames:
+					self.restart()
 			except KeyboardInterrupt:
 				#self.end_stream()
 				break
