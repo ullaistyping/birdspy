@@ -1,6 +1,6 @@
-from PIL import ImageGrab
 from PIL import Image
 from PIL import ImageChops
+from PIL import ImageFile # maybe fixes truncation error
 from collections import deque
 import os
 import numpy as np
@@ -14,7 +14,9 @@ import shutil
 from config import *
 from datetime import datetime
 
-testing = False
+ImageFile.LOAD_TRUNCATED_IMAGES = True
+
+testing = False 
 
 FRAME_DIR = 'frames'
 FFMPEG = "%ffmpeg%" if sys.platform == 'win32' else 'ffmpeg'
@@ -139,12 +141,12 @@ class MotionDetector():
 		self.grab_frames()
 
 	def run(self):
-		self.tasks = get_process()
+		#self.tasks = get_process()
 		self.restart()
 		#print(self.pro.pid)
 		time.sleep(1)
-		self.new = set(get_process()) - set(self.tasks)
-		print(self.new)
+		#self.new = set(get_process()) - set(self.tasks)
+		#print(self.new)
 		while True:
 			print(f'capturing image {self.frame_count}')
 			try:
@@ -170,8 +172,10 @@ class MotionDetector():
 				break
 
 def get_process():
-    proc = subprocess.Popen('tasklist', stdout=subprocess.PIPE)
-    return [i.split()[0] for i in proc.stdout.readlines()[1:]]
+    pass
+    #dosen't work with linux
+    #proc = subprocess.Popen('tasklist', stdout=subprocess.PIPE)
+    #return [i.split()[0] for i in proc.stdout.readlines()[1:]]
 
 def post_to_discord(link):
 	data = {'content':link}
@@ -184,3 +188,6 @@ def post_file_to_discord(path, msg="bird spotted?"):
         resp = requests.post(discord_hook_url, files=multipart, data=payload)
     return resp
 
+if __name__ == "__main__":
+    Mo = MotionDetector()
+    Mo.run()
